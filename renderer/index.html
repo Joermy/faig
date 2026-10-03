@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+<title>FAIG</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="chat-sidebar">
+      <div class="sidebar-top">
+        <span class="brand">FAIG</span>
+        <span class="brand-sub" title="Free AI Agent — lokaler KI-Coding-Agent, jedes Modell, jeder Provider.">Free AI Agent</span>
+      </div>
+      <button id="newChatBtn" class="new-chat-btn" title="Strg+N">+ Neuer Chat</button>
+      <div id="chatList" class="chat-list"></div>
+      <button id="openConnectionsBtn" class="connections-btn" title="Strg+,">⚙ Einstellungen</button>
+      <div id="buildInfoLine" class="build-info-line" title="Aktuell laufender Code-Stand — nach jeder Codeänderung App komplett neu starten (npm start), damit sich das hier ändert.">Build: —</div>
+    </aside>
+
+    <main class="chat-main">
+      <header class="chat-header">
+        <input id="chatTitleInput" class="chat-title-input" placeholder="Neuer Chat" />
+        <div class="chat-header-row">
+          <div class="header-popover-wrap">
+            <button id="modelMenuBtn" type="button" class="header-menu-btn" title="Connection & Modell wählen">
+              <span class="header-menu-icon">🔌</span>
+              <span id="modelMenuLabel" class="header-menu-label">Modell wählen</span>
+            </button>
+            <div id="modelMenu" class="header-popover" hidden>
+              <label class="popover-field">Connection
+                <select id="runConnection" title="Connection"></select>
+              </label>
+              <label class="popover-field">Modell
+                <select id="runModel" title="Modell"></select>
+                <input id="runModelManual" type="text" hidden placeholder="Modellname manuell eingeben" title="Modell (manuell)" />
+              </label>
+              <button id="loadModelsBtn" type="button" title="Modelle vom Server/Ordner laden">Modelle laden</button>
+            </div>
+          </div>
+
+          <div class="header-popover-wrap">
+            <button id="projectMenuBtn" type="button" class="header-menu-btn" title="Projektordner wählen">
+              <span class="header-menu-icon">📁</span>
+              <span id="projectMenuLabel" class="header-menu-label">Projektordner wählen</span>
+            </button>
+            <div id="projectMenu" class="header-popover" hidden>
+              <input id="folderPath" type="text" readonly placeholder="Kein Projektordner gewählt" title="Projektordner" />
+              <button id="pickFolderBtn" type="button">Ordner wählen</button>
+            </div>
+          </div>
+
+          <div class="header-popover-wrap">
+            <button id="toolsMenuBtn" type="button" class="header-menu-btn" title="Werkzeuge, die der Agent in diesem Chat benutzen darf">
+              <span class="header-menu-icon">🛠</span>
+              <span class="header-menu-label">Tools</span>
+              <span id="toolsMenuCount" class="tools-menu-count" hidden>0</span>
+            </button>
+            <div id="toolsMenu" class="header-popover" hidden>
+              <label class="checkbox small" title="Erlaubt Shell-Befehle, startend im Projektordner (z.B. npm install). Echte, unsandboxte Codeausführung auf deinem Rechner — nicht auf den Projektordner beschränkt.">
+                <input id="shellToolCheckbox" type="checkbox" />
+                Shell-Tool
+              </label>
+              <label class="checkbox small" title="Agent kann ein echtes, isoliertes Browserfenster steuern (navigieren, klicken, tippen) — echter Internetzugriff, eigenes Profil ohne deine gespeicherten Logins.">
+                <input id="browserToolCheckbox" type="checkbox" />
+                🌐 Browser
+              </label>
+              <label class="checkbox small" title="Agent kann echte E-Mails verschicken (SMTP-Konto nötig, siehe Connections-Fenster). Fragt IMMER erst nach — email_send funktioniert technisch nur nach einer Bestätigung in einer neuen Nachricht.">
+                <input id="emailToolCheckbox" type="checkbox" />
+                ✉️ E-Mail
+              </label>
+              <label class="checkbox small" title="Agent kann einen laufenden ComfyUI-Server steuern: Workflows auflisten/inspizieren und N-mal einreihen (Bild-/Video-Generierung). Server/Ordner im Connections-Fenster einstellen.">
+                <input id="comfyUiToolCheckbox" type="checkbox" />
+                🎬 ComfyUI
+              </label>
+              <label class="checkbox small" title="Agent kann direkt mit einer offenen Roblox Studio Session sprechen (über deren eingebauten MCP-Server) — echte Skript-Bearbeitung, Code-Ausführung, Konsolen-Output, statt nur Datei-Sync über Rojo. Braucht Studio offen mit aktiviertem 'Enable Studio as MCP Server' (Assistant → Manage MCP Servers).">
+                <input id="studioMcpToolCheckbox" type="checkbox" />
+                🎮 Studio MCP
+              </label>
+              <label class="checkbox small" title="Für größere Mehrfach-Feature-Projekte: Agent plant eine Roadmap im Vault, prüft jedes Feature selbst bevor er es abhakt, und arbeitet danach automatisch am nächsten Punkt weiter — ohne dass du jedes Mal antworten musst. Fragt trotzdem nach, wenn er wirklich eine Entscheidung von dir braucht.">
+                <input id="autopilotCheckbox" type="checkbox" />
+                🚀 Autopilot
+              </label>
+            </div>
+          </div>
+
+          <label class="checkbox small header-right" title="Wie viel das Modell nachdenken soll, bevor es antwortet — funktioniert unabhängig davon, welches Modell/welche Connection gerade läuft (Anthropic: Extended Thinking, OpenAI-kompatibel: reasoning_effort, lokales GGUF: Denk-Budget + Prompt-Instruktion).">
+            🧠 Denkaufwand
+            <select id="reasoningEffortSelect">
+              <option value="off">Aus</option>
+              <option value="low">Niedrig</option>
+              <option value="medium" selected>Mittel</option>
+              <option value="high">Hoch</option>
+              <option value="xhigh">Extra hoch</option>
+            </select>
+          </label>
+          <button id="chatSettingsToggleBtn" type="button" class="header-menu-btn" title="System-Prompt und erweiterte Modell-Einstellungen für diesen Chat">
+            <span class="header-menu-icon">⚙️</span>
+            <span class="header-menu-label">Chat</span>
+          </button>
+
+          <div class="header-popover-wrap">
+            <button id="moreMenuBtn" type="button" class="icon-btn header-icon-btn" title="Weitere Aktionen">⋯</button>
+            <div id="moreMenu" class="header-popover header-popover-right" hidden>
+              <button id="exportChatBtn" type="button" title="Chat als Markdown exportieren (Strg+E)">⬇ Exportieren</button>
+              <button id="clearHistoryBtn" hidden type="button" title="Nachrichtenverlauf dieses (angepinnten) Chats löschen — Connection/Ordner/Tools/Einstellungen bleiben. Nützlich wenn der Verlauf ein Modell in ein Antwortmuster festfährt.">🧹 Verlauf leeren</button>
+            </div>
+          </div>
+
+          <span id="statusText" class="status"></span>
+        </div>
+      </header>
+
+      <div class="chat-body">
+        <div class="chat-conversation">
+          <div id="messages" class="messages">
+            <div class="empty-state" id="emptyState">
+              Wähle oben eine Connection, ein Modell und einen Projektordner — dann leg los.
+            </div>
+          </div>
+
+          <div class="composer-row">
+            <label class="checkbox small" title="Sprachaufnahmen werden automatisch gesendet, Antworten werden vorgelesen (lokales TTS, keine Cloud).">
+              <input id="conversationModeCheckbox" type="checkbox" />
+              🗣️ Gesprächsmodus
+            </label>
+          </div>
+          <div class="composer">
+            <textarea id="taskInput" rows="1" placeholder="Nachricht an den Agent... (Enter = senden, Shift+Enter = neue Zeile)"></textarea>
+            <button id="micBtn" class="mic-btn" title="Spracheingabe (lokales Whisper-Modell, läuft offline)">🎤</button>
+            <button id="runBtn" class="send-btn" title="Senden">➤</button>
+            <button id="stopBtn" class="stop-btn" disabled title="Stoppen">■</button>
+          </div>
+        </div>
+
+        <aside id="chatSettingsPanel" class="chat-settings-panel" hidden>
+          <div class="chat-settings-panel-header">
+            <h3>Chat-Einstellungen</h3>
+            <button id="closeChatSettingsBtn" class="icon-btn">✕</button>
+          </div>
+          <div class="chat-settings-panel-body">
+            <section class="panel-section">
+              <h4>System-Prompt (optional)</h4>
+              <textarea
+                id="systemPromptInput"
+                rows="4"
+                placeholder="Zusätzliche Anweisungen für diesen Chat, z.B. 'Du bist Experte für Roblox-Luau-Tycoon-Systeme, schreib sauberen modernen Code mit ModuleScripts.' Wird zu den eingebauten Agent-Regeln hinzugefügt, ersetzt sie nicht."
+              ></textarea>
+            </section>
+
+            <section class="panel-section">
+              <h4>👁 Effektiver System-Prompt <button id="refreshSystemPromptViewBtn" type="button" class="icon-btn" title="Neu laden (automatisch generierte Regeln + Vault-Index + deine Ergänzung oben) — genau das, was gerade wirklich an das Modell geschickt wird.">🔄</button></h4>
+              <pre id="systemPromptView" class="system-prompt-view">Noch nicht geladen — 🔄 klicken.</pre>
+            </section>
+
+            <section class="panel-section">
+              <h4>⚙️ Modell-Einstellungen (erweitert, wie in LM Studio) — leer = Standard</h4>
+              <button id="autoOptimizeBtn" type="button" title="Liest die echten Metadaten des ausgewählten .gguf-Modells (Layer-Zahl, Architektur, trainierte Kontext-Größe) und berechnet GPU-Layer + Kontext-Größe passend zu deiner AKTUELLEN freien VRAM/RAM (node-llama-cpps eigener Resolver — nur für lokale .gguf-Connections).">🎯 Automatisch für meine Hardware optimieren</button>
+              <div id="autoOptimizeResult" class="auto-optimize-result" hidden></div>
+              <div class="sampling-grid">
+                <label>Temperature <input id="samplingTemperature" type="number" step="0.01" min="0" placeholder="z.B. 0.8" /></label>
+                <label>Top P <input id="samplingTopP" type="number" step="0.01" min="0" max="1" placeholder="z.B. 0.95" /></label>
+                <label>Top K <input id="samplingTopK" type="number" step="1" min="0" placeholder="z.B. 40" /></label>
+                <label>Min P <input id="samplingMinP" type="number" step="0.01" min="0" max="1" placeholder="z.B. 0.05" /></label>
+                <label>Repeat Penalty <input id="samplingRepeatPenalty" type="number" step="0.01" min="0" placeholder="z.B. 1.1" /></label>
+                <label>Repeat-Penalty Fenster (Tokens) <input id="samplingRepeatLastN" type="number" step="1" min="0" placeholder="z.B. 64" /></label>
+                <label>Max. Antwort-Tokens <input id="samplingMaxTokens" type="number" step="1" min="1" placeholder="Standard je Denkaufwand" /></label>
+                <label>Seed <input id="samplingSeed" type="number" step="1" placeholder="leer = zufällig" /></label>
+                <label class="sampling-span2">Stop-Sequenzen <span class="hint">(Komma-getrennt)</span> <input id="samplingStopSequences" type="text" placeholder="z.B. ###, END" /></label>
+                <label title="Nur lokales GGUF: Kontext-Fenster in Tokens.">Kontext-Größe (nur lokal) <input id="samplingContextSize" type="number" step="1" min="256" placeholder="auto" /></label>
+                <label title="Nur lokales GGUF: wie viele Layer auf die GPU geladen werden.">GPU-Layer (nur lokal) <input id="samplingGpuLayers" type="number" step="1" min="0" placeholder="auto" /></label>
+                <label title="Nur lokales GGUF: CPU-Threads für Auswertung (0 = alle verfügbaren).">CPU-Threads (nur lokal) <input id="samplingThreads" type="number" step="1" min="0" placeholder="auto" /></label>
+                <label title="Nur lokales GGUF: Batch-Größe (wie viele Tokens gleichzeitig verarbeitet werden).">Batch-Größe (nur lokal) <input id="samplingBatchSize" type="number" step="1" min="1" placeholder="auto" /></label>
+                <label class="checkbox small" title="Nur lokales GGUF: Flash Attention (schneller/weniger VRAM, falls Modell+Hardware es unterstützen).">
+                  <input id="samplingFlashAttention" type="checkbox" /> Flash Attention (nur lokal)
+                </label>
+                <div class="sampling-span2 form-actions">
+                  <button id="resetSamplingBtn" type="button">Auf Standard zurücksetzen</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <div id="modelLoadOverlay" class="modal-overlay" hidden>
+    <div class="modal model-load-card">
+      <div class="modal-header">
+        <h2>🤖 Modell wird geladen</h2>
+        <button class="icon-btn" id="modelLoadSpecsToggleBtn" title="VRAM/RAM-Anzeige an/aus">📊</button>
+      </div>
+      <div class="modal-body">
+        <div class="model-load-name" id="modelLoadName">—</div>
+        <div class="model-load-progress-track">
+          <div class="model-load-progress-fill" id="modelLoadProgressFill" style="width: 0%"></div>
+        </div>
+        <div class="model-load-progress-pct" id="modelLoadProgressPct">Startet...</div>
+
+        <div class="specs-grid" id="modelLoadSpecs" hidden>
+          <div class="specs-row">
+            <span class="specs-label">GPU</span>
+            <span class="specs-value" id="specsGpuName">—</span>
+          </div>
+          <div class="specs-bar-row">
+            <div class="specs-bar-track"><div class="specs-bar-fill" id="specsVramFill"></div></div>
+            <span class="specs-bar-text" id="specsVramText">—</span>
+          </div>
+          <div class="specs-row">
+            <span class="specs-label">RAM</span>
+            <span class="specs-value" id="specsRamText">—</span>
+          </div>
+        </div>
+        <div class="specs-warning" id="specsWarning" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="connectionsModal" class="modal-overlay" hidden>
+    <div class="modal settings-modal">
+      <div class="modal-header">
+        <h2>⚙ Einstellungen</h2>
+        <button id="closeConnectionsBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="settings-body">
+        <nav class="settings-nav">
+          <button class="settings-nav-item" data-section="connections" type="button">🔌 Connections</button>
+          <button class="settings-nav-item" data-section="vault" type="button">🧠 Vault</button>
+          <button class="settings-nav-item" data-section="comfyui" type="button">🎬 ComfyUI</button>
+          <button class="settings-nav-item" data-section="email" type="button">✉️ E-Mail</button>
+          <button class="settings-nav-item" data-section="system" type="button">🖥️ System</button>
+        </nav>
+        <div class="settings-content">
+        <section class="settings-section" data-section-panel="connections">
+        <div id="connectionCards" class="connection-cards"></div>
+
+        <div class="add-connection-form">
+          <h3 id="connFormTitle">Neue Connection</h3>
+          <div class="form">
+            <label>Vorlage
+              <select id="tplSelect">
+                <option value="">— manuell —</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="ollama">Ollama (lokal)</option>
+                <option value="lmstudio">LM Studio (lokal)</option>
+                <option value="localgguf">Lokale .gguf-Datei(en) — kein Server nötig</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+              </select>
+            </label>
+            <label>Name
+              <input id="connName" type="text" placeholder="z.B. Mein lokales Qwen" />
+            </label>
+            <label>Typ
+              <select id="connKind">
+                <option value="openai-compatible">OpenAI-kompatibel (OpenRouter, Ollama, LM Studio, OpenAI, ...)</option>
+                <option value="anthropic">Anthropic (Claude native API)</option>
+                <option value="local-gguf">Lokale .gguf-Datei (node-llama-cpp, kein Server)</option>
+              </select>
+            </label>
+            <div id="httpFields">
+              <label>Base URL
+                <input id="connBaseUrl" type="text" placeholder="https://openrouter.ai/api/v1" />
+              </label>
+              <label>API Key <span class="hint">(leer lassen für lokale Server ohne Key)</span>
+                <input id="connApiKey" type="password" placeholder="sk-..." />
+              </label>
+            </div>
+            <div id="localGgufFields" hidden>
+              <label>Ordner mit .gguf-Dateien
+                <span class="hint">Alle .gguf-Dateien darin (auch in Unterordnern, 2 Ebenen) erscheinen später im Modell-Dropdown.</span>
+                <input id="connModelsFolder" type="text" readonly placeholder="Noch kein Ordner gewählt" />
+              </label>
+              <button id="pickModelsFolderBtn" type="button">Ordner wählen</button>
+              <div class="hint">
+                Läuft direkt in der App (node-llama-cpp), kein Ollama/LM Studio nötig. Für GPU-Beschleunigung
+                unter Windows: NVIDIA-Treiber + CUDA Toolkit 13.1+ vorher installieren, sonst läuft es (langsam) auf der CPU.
+              </div>
+            </div>
+            <div class="form-actions">
+              <button id="saveConnectionBtn" class="primary">Speichern</button>
+              <button id="cancelEditBtn" hidden type="button">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          <strong>Wichtig:</strong> Ein ChatGPT- oder Claude.ai-Abo (Plus/Pro/Max) ist
+          <em>kein</em> API-Key. API-Zugriff wird separat nach Tokens abgerechnet
+          (platform.openai.com bzw. console.anthropic.com) — ein Abo-Login lässt sich hier
+          nicht eintragen, das ist inzwischen auch von den Anbietern für Drittanbieter-Apps untersagt.
+        </div>
+        </section>
+
+        <section class="settings-section" data-section-panel="email" hidden>
+        <div class="add-connection-form">
+          <h3>✉️ E-Mail-Konto (für das E-Mail-Tool)</h3>
+          <div class="form">
+            <label>Vorlage
+              <select id="emailTplSelect">
+                <option value="">— manuell (eigener SMTP-Server) —</option>
+                <option value="gmail">Gmail (smtp.gmail.com, App-Passwort nötig)</option>
+                <option value="outlook">Outlook/Microsoft 365 (smtp.office365.com)</option>
+              </select>
+            </label>
+            <label>Angezeigter Absender-Name
+              <input id="emailFromName" type="text" placeholder="z.B. FAIG" />
+            </label>
+            <label>Absender-E-Mail-Adresse
+              <input id="emailFromAddress" type="text" placeholder="deine@adresse.de" />
+            </label>
+            <label>SMTP-Host
+              <input id="emailHost" type="text" placeholder="smtp.gmail.com" />
+            </label>
+            <label>Port
+              <input id="emailPort" type="text" placeholder="587" />
+            </label>
+            <label class="checkbox small">
+              <input id="emailSecure" type="checkbox" />
+              SSL/TLS direkt (Port 465) statt STARTTLS (Port 587)
+            </label>
+            <label>Benutzername
+              <input id="emailUser" type="text" placeholder="meist deine E-Mail-Adresse" />
+            </label>
+            <label>Passwort <span class="hint">(bei Gmail/Outlook: App-Passwort, nicht dein normales Login-Passwort)</span>
+              <input id="emailPass" type="password" placeholder="App-Passwort" />
+            </label>
+            <div class="form-actions">
+              <button id="saveEmailAccountBtn" class="primary" type="button">E-Mail-Konto speichern</button>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="settings-section" data-section-panel="vault" hidden>
+        <div class="add-connection-form">
+          <h3>🧠 Obsidian-Vault (zweites Gehirn — immer in jedem Chat aktiv)</h3>
+          <div class="form">
+            <label>Vault-Ordner
+              <span class="hint">Obsidian-Tools (obsidian_search_notes etc.) und der Vault-Index im System-Prompt sind IMMER auf diesen Ordner sandboxed, egal welcher Projektordner im jeweiligen Chat gewählt ist.</span>
+              <input id="vaultPathInput" type="text" readonly placeholder="Noch kein Vault gewählt" />
+            </label>
+            <button id="pickVaultPathBtn" type="button">Ordner wählen</button>
+            <div class="form-actions">
+              <button id="saveVaultPathBtn" class="primary" type="button">Vault-Pfad speichern</button>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="settings-section" data-section-panel="comfyui" hidden>
+        <div class="add-connection-form">
+          <h3>🎬 ComfyUI (für das ComfyUI-Tool)</h3>
+          <div class="form">
+            <label>Server-URL
+              <input id="comfyUiBaseUrl" type="text" placeholder="http://127.0.0.1:8188" />
+            </label>
+            <label>ComfyUI-Workflow-Ordner
+              <span class="hint">Der Ordner, der die Workflow-.json-Dateien enthält, z.B. "...\ComfyUI\user\default\workflows".</span>
+              <input id="comfyUiWorkflowsDir" type="text" readonly placeholder="Noch kein Ordner gewählt" />
+            </label>
+            <button id="pickComfyUiWorkflowsDirBtn" type="button">Ordner wählen</button>
+            <div class="form-actions">
+              <button id="saveComfyUiBtn" class="primary" type="button">ComfyUI-Einstellungen speichern</button>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="settings-section" data-section-panel="system" hidden>
+          <h3>🖥️ System (live)</h3>
+          <div class="specs-grid" id="settingsSpecsGrid">
+            <div class="specs-row">
+              <span class="specs-label">GPU</span>
+              <span class="specs-value" id="settingsSpecsGpuName">—</span>
+            </div>
+            <div class="specs-bar-row">
+              <div class="specs-bar-track"><div class="specs-bar-fill" id="settingsSpecsVramFill"></div></div>
+              <span class="specs-bar-text" id="settingsSpecsVramText">—</span>
+            </div>
+            <div class="specs-row">
+              <span class="specs-label">RAM</span>
+              <span class="specs-value" id="settingsSpecsRamText">—</span>
+            </div>
+          </div>
+          <div class="specs-warning" id="settingsSpecsWarning" hidden></div>
+          <div class="hint" id="settingsSpecsNoGpu" hidden>Kein NVIDIA-GPU/nvidia-smi gefunden — nur RAM-Info verfügbar.</div>
+          <button id="refreshSpecsBtn" type="button">Aktualisieren</button>
+        </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

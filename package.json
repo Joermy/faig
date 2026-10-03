@@ -1,0 +1,74 @@
+{
+  "name": "freeagent-desktop",
+  "version": "0.5.1",
+  "description": "FAIG (Free AI Agent) - universal local AI coding agent desktop app. Any model, any provider, one exe. (npm \"name\" field intentionally left as freeagent-desktop, see note below \"build\" — changing it moves Electron's userData folder and would silently lose all saved Connections/Chats.)",
+  "main": "main.js",
+  "author": "lights",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:portable": "electron-builder --win portable",
+    "build:all": "electron-builder -mwl"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "electron-store": "^8.2.0",
+    "node-llama-cpp": "^3.0.0",
+    "nodemailer": "^6.9.0",
+    "playwright": "^1.56.0",
+    "say": "^0.16.0",
+    "yt-dlp-exec": "^1.0.0"
+  },
+  "build": {
+    "appId": "com.lights.faig",
+    "productName": "FAIG",
+    "directories": {
+      "output": "dist"
+    },
+    "asarUnpack": [
+      "**/node_modules/node-llama-cpp/**/*",
+      "**/node_modules/playwright/**/*",
+      "**/node_modules/playwright-core/**/*",
+      "**/node_modules/onnxruntime-node/**/*",
+      "**/node_modules/@huggingface/transformers/**/*",
+      "**/node_modules/yt-dlp-exec/**/*"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "requestExecutionLevel": "user",
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
